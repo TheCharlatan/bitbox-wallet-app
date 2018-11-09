@@ -27,6 +27,8 @@ import (
 	"github.com/cloudfoundry-attic/jibber_jabber"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/accounts"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/arguments"
+	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase"
+	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/mdns"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/coins/btc"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/coins/btc/electrum"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/coins/btc/electrum/client"
@@ -110,18 +112,23 @@ type Backend struct {
 
 	notifier *Notifier
 
-	devices         map[string]device.Interface
-	keystores       *keystore.Keystores
-	onAccountInit   func(accounts.Interface)
-	onAccountUninit func(accounts.Interface)
-	onDeviceInit    func(device.Interface)
-	onDeviceUninit  func(string)
+	devices            map[string]device.Interface
+	bitboxBases        map[string]bitboxbase.Interface
+	keystores          *keystore.Keystores
+	onAccountInit      func(accounts.Interface)
+	onAccountUninit    func(accounts.Interface)
+	onDeviceInit       func(device.Interface)
+	onDeviceUninit     func(string)
+	onBitBoxBaseInit   func(bitboxbase.Interface)
+	onBitBoxBaseUninit func(string)
 
 	coins     map[string]coin.Coin
 	coinsLock locker.Locker
 
 	accounts     []accounts.Interface
 	accountsLock locker.Locker
+
+	baseDetector *mdns.Detector
 
 	log *logrus.Entry
 }
@@ -139,13 +146,16 @@ func NewBackend(arguments *arguments.Arguments, environment Environment) (*Backe
 		config:      config,
 		events:      make(chan interface{}, 1000),
 
-		devices:   map[string]device.Interface{},
-		keystores: keystore.NewKeystores(),
-		coins:     map[string]coin.Coin{},
-		accounts:  []accounts.Interface{},
-		log:       log,
+		devices:     map[string]device.Interface{},
+		bitboxBases: map[string]bitboxbase.Interface{},
+		keystores:   keystore.NewKeystores(),
+		coins:       map[string]coin.Coin{},
+		accounts:    []accounts.Interface{},
+		log:         log,
 	}
 	notifier, err := NewNotifier(filepath.Join(arguments.MainDirectoryPath(), "notifier.db"))
+	backend.baseDetector = mdns.NewDetector(backend.bitBoxBaseRegister, backend.BitBoxBaseDeregister)
+
 	if err != nil {
 		return nil, err
 	}
@@ -568,6 +578,16 @@ func (backend *Backend) OnDeviceUninit(f func(string)) {
 	backend.onDeviceUninit = f
 }
 
+// OnBitBoxBaseInit installs a callback to be called when a bitboxbase is initialized.
+func (backend *Backend) OnBitBoxBaseInit(f func(bitboxbase.Interface)) {
+	backend.onBitBoxBaseInit = f
+}
+
+// OnBitBoxBaseUninit installs a callback to be called when a bitboxbase is uninitialized.
+func (backend *Backend) OnBitBoxBaseUninit(f func(string)) {
+	backend.onBitBoxBaseUninit = f
+}
+
 // Start starts the background services. It returns a channel of events to handle by the library
 // client.
 func (backend *Backend) Start() <-chan interface{} {
@@ -576,6 +596,10 @@ func (backend *Backend) Start() <-chan interface{} {
 		backend.arguments.BitBox02DirectoryPath(),
 		backend.Register,
 		backend.Deregister).Start()
+
+	if backend.arguments.DevMode() {
+		backend.baseDetector.Start()
+	}
 	backend.initPersistedAccounts()
 	return backend.events
 }
@@ -585,9 +609,47 @@ func (backend *Backend) Events() <-chan interface{} {
 	return backend.events
 }
 
+// TryMakeNewBase calls TryMakeNewBase() in the detector with the given ip
+func (backend *Backend) TryMakeNewBase(ip string) (bool, error) {
+	return backend.baseDetector.TryMakeNewBase(ip)
+}
+
 // DevicesRegistered returns a map of device IDs to device of registered devices.
 func (backend *Backend) DevicesRegistered() map[string]device.Interface {
 	return backend.devices
+}
+
+// BitBoxBasesRegistered returns a map of bitboxBaseIDs and registered bitbox bases.
+func (backend *Backend) BitBoxBasesRegistered() map[string]bitboxbase.Interface {
+	return backend.bitboxBases
+}
+
+// bitBoxBaseRegister registers the given bitboxbase at this backend.
+func (backend *Backend) bitBoxBaseRegister(theBase bitboxbase.Interface) error {
+	backend.bitboxBases[theBase.Identifier()] = theBase
+	backend.onBitBoxBaseInit(theBase)
+	theBase.Init(backend.Testing())
+	theBase.GetUpdaterInstance().Observe(func(event observable.Event) { backend.events <- event })
+	select {
+	case backend.events <- backendEvent{
+		Type: "bitboxbases",
+		Data: "registeredChanged",
+	}:
+	default:
+	}
+	return nil
+}
+
+// BitBoxBaseDeregister deregisters the device with the given ID from this backend.
+func (backend *Backend) BitBoxBaseDeregister(bitboxBaseID string) {
+	if _, ok := backend.bitboxBases[bitboxBaseID]; ok {
+		backend.bitboxBases[bitboxBaseID].Close()
+		backend.onBitBoxBaseUninit(bitboxBaseID)
+		delete(backend.bitboxBases, bitboxBaseID)
+		backend.baseDetector.RemoveBase(bitboxBaseID)
+		backend.events <- backendEvent{Type: "bitboxbases", Data: "registeredChanged"}
+	}
+	backend.events <- backendEvent{Type: "bitboxbases", Data: "registeredChanged"}
 }
 
 func (backend *Backend) uninitAccounts() {
