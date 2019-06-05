@@ -120,8 +120,106 @@ ffbrVM+I91v3R03Svv2Nte2xdbx1RmoI/y3tMyZL
 -----END CERTIFICATE-----
 `
 
+const devShiftCA = `-----BEGIN CERTIFICATE-----
+MIIGGjCCBAKgAwIBAgIJAO1AEqR+xvjRMA0GCSqGSIb3DQEBDQUAMIGZMQswCQYD
+VQQGEwJDSDEPMA0GA1UECAwGWnVyaWNoMR0wGwYDVQQKDBRTaGlmdCBDcnlwdG9z
+ZWN1cml0eTEzMDEGA1UECwwqU2hpZnQgQ3J5cHRvc2VjdXJpdHkgQ2VydGlmaWNh
+dGUgQXV0aG9yaXR5MSUwIwYDVQQDDBxTaGlmdCBDcnlwdG9zZWN1cml0eSBSb290
+IENBMB4XDTE4MDMwNzE3MzUxMloXDTM4MDMwMjE3MzUxMlowgZkxCzAJBgNVBAYT
+AkNIMQ8wDQYDVQQIDAZadXJpY2gxHTAbBgNVBAoMFFNoaWZ0IENyeXB0b3NlY3Vy
+aXR5MTMwMQYDVQQLDCpTaGlmdCBDcnlwdG9zZWN1cml0eSBDZXJ0aWZpY2F0ZSBB
+dXRob3JpdHkxJTAjBgNVBAMMHFNoaWZ0IENyeXB0b3NlY3VyaXR5IFJvb3QgQ0Ew
+ggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDlz32VZk/D3rfm7Qwx6WkE
+Fp9cdQV2FNYTeTjWVErVeTev02ctHHXV1fR3Svk8iIJWaALSJy7phdEDwC/3gDIQ
+Ylm15kpntCibOWiQPZZxGq7Udts20fooccdZqtG/PKFRCPWZ2MOgHAOWDKGk6Kb+
+siqkr55hkxwtiHuwkCcTh/Q2orEIuteSRbbYwgURZwd6dDIQq4ty7reC3j32xphh
+edbnVBoDE6DSdebSS5SJL/gb6LxUdio98XdJPwkaD8292uEODxx0DKw/Ou2e1f5Q
+Iv1WBl+LBaSrZ3sJSFUqoSvCQwBQmMAPoPJ1O13jCnFz1xoNygxUfz2eiKRL5E2l
+VTmTh7zIez4oniOh5MOmDnKMVgTUGP1II2UU5r6PAq2tDpw4lVwyezhyLaBegwMc
+pg/LinbABxUJrP8c8G2tve0yuTAhsir7r+Koo+nAE7FwcuIkD0UTyQcoag2IMS8O
+dKZdYMGXjfUPJRBWg60LfXJeqMyU1oHpDrsRoa5iaYPt7ZApxc41kyynqfuuuIRD
+du8327gd1nJ6ExMxGHY7dYelE4GNkOg3R0+5czykm/RxnGyDuDcO/RcYBJTChN1L
+HYq+dTt0dYPAzBtiXnfuvjDyOsDK5f65pbrDgoOr6AQ4lvDJabcXFsWPrulM9Dyu
+p0Y4+fuwXOCd8cr1Zm34MQIDAQABo2MwYTAdBgNVHQ4EFgQU486X86LMbNNSDw7J
+NcT2U30NrikwHwYDVR0jBBgwFoAU486X86LMbNNSDw7JNcT2U30NrikwDwYDVR0T
+AQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAYYwDQYJKoZIhvcNAQENBQADggIBAN0N
+IPVBv8aaKDHDK9Nsu5fwiGp8GgkAN0B1+D34CbxTuzCDurToVMHCPEdo9tk/AzE4
+Aa1p/kMW9X3XP8IyCFFj+BpEVkBRr9fXTVuh3XRHbyN6tXFbkKWQ/6QeUcnefq2k
+DCpqEGjJQWsujZ4tJKkJl2HLIBZL6FAa/kaDLFHd3LeV1immC66CiN3ieHejCJL1
+zZXiWi8pNxvEanTLPBaBjCw/AAl/owg/ySu2hGZzL0wsFboPrUbo4J+KvL1pvwql
+PCT8AylJKCu+cn/N9zZDtUsgZJQBIq7btoakC3mCSnfVTlcbxfHVef0DbfohFqoV
+ZpdmIuy0/njw7o+2uL/ArPJscPOhNl60ocDbdFIyYvc85oxyts8yMvKDdWV9Bm//
+kl7lv4QUAvjqjb7ZgUhYibVk3Eu6n1MGZOP40l1/mm922/Wcd2n/HZVk/LsJs4tt
+B6DLMDpf5nzeI1Yz/QtDGvNyb4aiJoRV5tQb9KkFfIeSzBS/ORZto4tVHKS37lxV
+d1r8kFyCgpL9KASdahfyLBWCC7awlcOQP1QJA5QoO9u5Feq3lU0VnJF0YCZh8GOy
+py3n1TR6S59eT495BiKDjWnhdVchEa8zMGIW/wFW7EX/LyW2zX3hQsdfnmMWUPVr
+O3nOxjgSfRAfKWQ2Ny1APKcn6I83P5PFLhtO5I12
+-----END CERTIFICATE-----`
+
 // NewDefaultAppConfig returns the default app config.
-func NewDefaultAppConfig() AppConfig {
+func NewDefaultAppConfig(devMode bool) AppConfig {
+	if devMode {
+		return AppConfig{
+			Backend: Backend{
+				BitcoinP2PKHActive:       false,
+				BitcoinP2WPKHP2SHActive:  true,
+				BitcoinP2WPKHActive:      false,
+				LitecoinP2WPKHP2SHActive: true,
+				LitecoinP2WPKHActive:     false,
+				EthereumActive:           true,
+				BTC: btcCoinConfig{
+					ElectrumServers: []*rpc.ServerInfo{
+						{
+							Server:  "dev.shiftcrypto.ch:50002",
+							TLS:     true,
+							PEMCert: devShiftCA,
+						},
+					},
+				},
+				TBTC: btcCoinConfig{
+					ElectrumServers: []*rpc.ServerInfo{
+						{
+							Server:  "s1.dev.shiftcrypto.ch:51003",
+							TLS:     true,
+							PEMCert: devShiftCA,
+						},
+						{
+							Server:  "s2.dev.shiftcrypto.ch:51003",
+							TLS:     true,
+							PEMCert: devShiftCA,
+						},
+					},
+				},
+				LTC: btcCoinConfig{
+					ElectrumServers: []*rpc.ServerInfo{
+						{
+							Server:  "dev.shiftcrypto.ch:50004",
+							TLS:     true,
+							PEMCert: devShiftCA,
+						},
+					},
+				},
+				TLTC: btcCoinConfig{
+					ElectrumServers: []*rpc.ServerInfo{
+						{
+							Server:  "dev.shiftcrypto.ch:51004",
+							TLS:     true,
+							PEMCert: devShiftCA,
+						},
+					},
+				},
+				ETH: ethCoinConfig{
+					NodeURL: "https://mainnet.infura.io/" + infuraAPIKey,
+				},
+				TETH: ethCoinConfig{
+					NodeURL: "https://ropsten.infura.io/" + infuraAPIKey,
+				},
+				RETH: ethCoinConfig{
+					NodeURL: "https://rinkeby.infura.io/" + infuraAPIKey,
+				},
+			},
+		}
+	}
 	return AppConfig{
 		Backend: Backend{
 			BitcoinP2PKHActive:       false,
@@ -212,10 +310,10 @@ type Config struct {
 
 // NewConfig creates a new Config, stored in the given location. The filename must be writable, but
 // does not have to exist.
-func NewConfig(appConfigFilename string, accountsConfigFilename string) (*Config, error) {
+func NewConfig(appConfigFilename string, accountsConfigFilename string, devMode bool) (*Config, error) {
 	config := &Config{
 		appConfigFilename: appConfigFilename,
-		appConfig:         NewDefaultAppConfig(),
+		appConfig:         NewDefaultAppConfig(devMode),
 
 		accountsConfigFilename: accountsConfigFilename,
 		accountsConfig:         newDefaultAccountsonfig(),
@@ -262,6 +360,31 @@ func (config *Config) SetAppConfig(appConfig AppConfig) error {
 func (config *Config) AccountsConfig() AccountsConfig {
 	defer config.lock.RLock()()
 	return config.accountsConfig
+}
+
+// SetBtcOnly sets non-bitcoin accounts in the config to false
+func (config *Config) SetBtcOnly() {
+	config.appConfig.Backend.LitecoinP2WPKHP2SHActive = false
+	config.appConfig.Backend.LitecoinP2WPKHActive = false
+	config.appConfig.Backend.EthereumActive = false
+}
+
+// BaseBtcConfig sets the TBTC configuration to the provided electrumIP and electrumCert
+func (config *Config) BaseBtcConfig(electrumIP, electrumCert string, network string) {
+	var btcBaseCoinConfig = btcCoinConfig{
+		ElectrumServers: []*rpc.ServerInfo{
+			{
+				Server:  electrumIP,
+				TLS:     true,
+				PEMCert: electrumCert,
+			},
+		},
+	}
+	if network == "testnet" {
+		config.appConfig.Backend.TBTC = btcBaseCoinConfig
+	} else {
+		config.appConfig.Backend.BTC = btcBaseCoinConfig
+	}
 }
 
 // SetAccountsConfig sets and persists the accounts config.

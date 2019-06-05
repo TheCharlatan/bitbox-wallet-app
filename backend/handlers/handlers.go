@@ -191,6 +191,7 @@ func NewHandlers(
 	getAPIRouter(apiRouter)("/certs/check", handlers.postCertsCheckHandler).Methods("POST")
 	getAPIRouter(apiRouter)("/bitboxbases/connectbase", handlers.postConnectBaseHandler).Methods("POST")
 	getAPIRouter(apiRouter)("/bitboxbases/disconnectbase", handlers.postDisconnectBaseHandler).Methods("POST")
+	getAPIRouter(apiRouter)("/bitboxbases/connectElectrum", handlers.postConnectElectrumHandler).Methods("POST")
 
 	devicesRouter := getAPIRouter(apiRouter.PathPrefix("/devices").Subrouter())
 	bitboxBasesRouter := getAPIRouter(apiRouter.PathPrefix("/bitboxbases").Subrouter())
@@ -682,6 +683,55 @@ func (handlers *Handlers) postDisconnectBaseHandler(r *http.Request) (interface{
 
 	//Implment proper error handling for deregister
 	handlers.backend.BitBoxBaseDeregister(bitboxBaseID)
+	var success = true
+	return map[string]interface{}{"success": success}, nil
+}
+
+func (handlers *Handlers) postConnectElectrumHandler(r *http.Request) (interface{}, error) {
+	jsonBody := map[string]string{}
+	if err := json.NewDecoder(r.Body).Decode(&jsonBody); err != nil {
+		return nil, errp.WithStack(err)
+	}
+	bitboxBaseID := jsonBody["bitboxBaseID"]
+	bitboxBase := handlers.backend.BitBoxBasesRegistered()[bitboxBaseID]
+	bitboxBaseIP := bitboxBase.GetIP()
+	// 51002 is the bitbox bases's testnet nginx electrum ssl port
+	electrumIP := bitboxBaseIP + ":" + bitboxBase.GetElectrsRPCPort()
+
+	electrumCert, err := handlers.backend.DownloadCert(electrumIP)
+	if err != nil {
+		handlers.log.WithField("ElectrumIP: ", electrumIP).Error(err.Error())
+		return map[string]interface{}{
+			"success":      false,
+			"errorMessage": err.Error(),
+		}, nil
+	}
+
+	if err := handlers.backend.CheckElectrumServer(
+		electrumIP,
+		electrumCert); err != nil {
+		handlers.log.WithField("ElectrumIP: ", electrumIP).Error(err.Error())
+		return map[string]interface{}{
+			"success":      false,
+			"errorMessage": err.Error(),
+		}, nil
+	}
+
+	handlers.log.WithField("ElectrumIP:", electrumIP).Debug("Connecting to new electrum Server...")
+
+	config := handlers.backend.Config()
+	// BaseBtcConfig sets the TBTC configs to the provided cert and ip.
+	config.BaseBtcConfig(electrumIP, electrumCert, bitboxBase.GetNetwork())
+	// Disable Litecoin and Ethereum accounts - we do not want any more traffic hitting other servers
+	config.SetBtcOnly()
+
+	if err := handlers.backend.Config().SetAppConfig(config.AppConfig()); err != nil {
+		return map[string]interface{}{
+			"success":      false,
+			"errorMessage": err.Error(),
+		}, nil
+	}
+
 	var success = true
 	return map[string]interface{}{"success": success}, nil
 }

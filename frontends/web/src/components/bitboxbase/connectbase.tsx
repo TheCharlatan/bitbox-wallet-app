@@ -64,6 +64,18 @@ export class ConnectedBase extends Component<Props, State> {
 
     }
 
+    private connectElectrum = (event: Event) => {
+        event.preventDefault();
+        apiPost('bitboxbases/connectElectrum', {
+            bitboxBaseID : this.props.bitboxBaseID,
+        }).then(data => {
+            const { success } = data;
+            if (!success) {
+                alertUser(data.errorMessage);
+            }
+        });
+    }
+
     public render(
         {
             bitboxBaseID,
@@ -95,6 +107,11 @@ export class ConnectedBase extends Component<Props, State> {
                         <p>Lightning Alias: {alias}</p>
                         <div class="buttons flex flex-row flex-end">
                             <Button onClick={this.removeBitBoxBase} danger>Delete</Button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="buttons flex flex-row flex-end">
+                            <Button onClick={this.connectElectrum}>Connect Electrum</Button>
                         </div>
                     </div>
                 </div>

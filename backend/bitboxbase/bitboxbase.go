@@ -15,9 +15,13 @@
 package bitboxbase
 
 import (
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/updater"
+	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
+	"github.com/sirupsen/logrus"
 )
 
 // Interface represents bitbox base.
@@ -38,25 +42,57 @@ type Interface interface {
 
 	// BlockInfo returns some blockchain information.
 	BlockInfo() string
+
+	// GetIP implement a getter for the IP under which the base is reachable
+	GetIP() string
+
+	// GetElectrsRPCPort implements a getter for the electrs rpc port
+	GetElectrsRPCPort() string
+
+	// GetNetwork implements a getter for the network type, either mainnet or testnet
+	GetNetwork() string
 }
 
 //BitBoxBase provides the dictated bitboxbase api to communicate with the base
 type BitBoxBase struct {
 	bitboxBaseID    string //This is just the ip at the moment, but will be an actual unique string, once the noise pairing is implemented
 	registerTime    time.Time
+	ip              string
 	closed          bool
 	updaterInstance *updater.Updater
+	electrsRPCPort  string
+	network         string
+	log             *logrus.Entry
 }
 
 //NewBitBoxBase creates a new bitboxBase instance
 func NewBitBoxBase(ip string, id string) (*BitBoxBase, error) {
 	bitboxBase := &BitBoxBase{
+		log:             logging.Get().WithGroup("bitboxbase"),
 		bitboxBaseID:    id,
 		closed:          false,
-		updaterInstance: updater.NewUpdater(),
+		ip:              strings.Split(ip, ":")[0],
+		updaterInstance: updater.NewUpdater(ip),
 		registerTime:    time.Now(),
 	}
 	err := bitboxBase.GetUpdaterInstance().Connect(ip, bitboxBase.bitboxBaseID)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyBytes, err := bitboxBase.GetUpdaterInstance().GetEnv()
+	if err != nil {
+		return nil, err
+	}
+	var envData map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &envData); err != nil {
+		bitboxBase.log.WithError(err).Error(" Failed to unmarshal GetEnv body bytes")
+		bitboxBase.GetUpdaterInstance().Stop()
+		return nil, err
+	}
+	bitboxBase.electrsRPCPort, _ = envData["electrsRPCPort"].(string)
+	bitboxBase.network, _ = envData["network"].(string)
+
 	return bitboxBase, err
 }
 
@@ -70,9 +106,24 @@ func (base *BitBoxBase) BlockInfo() string {
 	return base.GetUpdaterInstance().BlockInfo()
 }
 
+//GetIP implements a getter for the bitboxBase ip
+func (base *BitBoxBase) GetIP() string {
+	return base.ip
+}
+
 //Identifier implements a getter for the bitboxBase ID
 func (base *BitBoxBase) Identifier() string {
 	return base.bitboxBaseID
+}
+
+// GetElectrsRPCPort implements a getter for the electrsport
+func (base *BitBoxBase) GetElectrsRPCPort() string {
+	return base.electrsRPCPort
+}
+
+//GetNetwork implements a getter for the network string (either mainnet or testnet)
+func (base *BitBoxBase) GetNetwork() string {
+	return base.network
 }
 
 //GetRegisterTime implements a getter for the timestamp of when the bitboxBase was registered

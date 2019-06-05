@@ -136,7 +136,7 @@ type Backend struct {
 // NewBackend creates a new backend with the given arguments.
 func NewBackend(arguments *arguments.Arguments, environment Environment) (*Backend, error) {
 	log := logging.Get().WithGroup("backend")
-	config, err := config.NewConfig(arguments.AppConfigFilename(), arguments.AccountsConfigFilename())
+	config, err := config.NewConfig(arguments.AppConfigFilename(), arguments.AccountsConfigFilename(), arguments.DevMode())
 	if err != nil {
 		return nil, errp.WithStack(err)
 	}
@@ -304,10 +304,10 @@ func (backend *Backend) Config() *config.Config {
 
 // DefaultAppConfig returns the default app config.y
 func (backend *Backend) DefaultAppConfig() config.AppConfig {
-	return config.NewDefaultAppConfig()
+	return config.NewDefaultAppConfig(backend.arguments.DevMode())
 }
 
-func (backend *Backend) defaultProdServers(code string) []*rpc.ServerInfo {
+func (backend *Backend) defaultElectrumXServers(code string) []*rpc.ServerInfo {
 	switch code {
 	case coinBTC:
 		return backend.config.AppConfig().Backend.BTC.ElectrumServers
@@ -320,68 +320,6 @@ func (backend *Backend) defaultProdServers(code string) []*rpc.ServerInfo {
 	default:
 		panic(errp.Newf("The given code %s is unknown.", code))
 	}
-}
-
-func defaultDevServers(code string) []*rpc.ServerInfo {
-	const devShiftCA = `-----BEGIN CERTIFICATE-----
-MIIGGjCCBAKgAwIBAgIJAO1AEqR+xvjRMA0GCSqGSIb3DQEBDQUAMIGZMQswCQYD
-VQQGEwJDSDEPMA0GA1UECAwGWnVyaWNoMR0wGwYDVQQKDBRTaGlmdCBDcnlwdG9z
-ZWN1cml0eTEzMDEGA1UECwwqU2hpZnQgQ3J5cHRvc2VjdXJpdHkgQ2VydGlmaWNh
-dGUgQXV0aG9yaXR5MSUwIwYDVQQDDBxTaGlmdCBDcnlwdG9zZWN1cml0eSBSb290
-IENBMB4XDTE4MDMwNzE3MzUxMloXDTM4MDMwMjE3MzUxMlowgZkxCzAJBgNVBAYT
-AkNIMQ8wDQYDVQQIDAZadXJpY2gxHTAbBgNVBAoMFFNoaWZ0IENyeXB0b3NlY3Vy
-aXR5MTMwMQYDVQQLDCpTaGlmdCBDcnlwdG9zZWN1cml0eSBDZXJ0aWZpY2F0ZSBB
-dXRob3JpdHkxJTAjBgNVBAMMHFNoaWZ0IENyeXB0b3NlY3VyaXR5IFJvb3QgQ0Ew
-ggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDlz32VZk/D3rfm7Qwx6WkE
-Fp9cdQV2FNYTeTjWVErVeTev02ctHHXV1fR3Svk8iIJWaALSJy7phdEDwC/3gDIQ
-Ylm15kpntCibOWiQPZZxGq7Udts20fooccdZqtG/PKFRCPWZ2MOgHAOWDKGk6Kb+
-siqkr55hkxwtiHuwkCcTh/Q2orEIuteSRbbYwgURZwd6dDIQq4ty7reC3j32xphh
-edbnVBoDE6DSdebSS5SJL/gb6LxUdio98XdJPwkaD8292uEODxx0DKw/Ou2e1f5Q
-Iv1WBl+LBaSrZ3sJSFUqoSvCQwBQmMAPoPJ1O13jCnFz1xoNygxUfz2eiKRL5E2l
-VTmTh7zIez4oniOh5MOmDnKMVgTUGP1II2UU5r6PAq2tDpw4lVwyezhyLaBegwMc
-pg/LinbABxUJrP8c8G2tve0yuTAhsir7r+Koo+nAE7FwcuIkD0UTyQcoag2IMS8O
-dKZdYMGXjfUPJRBWg60LfXJeqMyU1oHpDrsRoa5iaYPt7ZApxc41kyynqfuuuIRD
-du8327gd1nJ6ExMxGHY7dYelE4GNkOg3R0+5czykm/RxnGyDuDcO/RcYBJTChN1L
-HYq+dTt0dYPAzBtiXnfuvjDyOsDK5f65pbrDgoOr6AQ4lvDJabcXFsWPrulM9Dyu
-p0Y4+fuwXOCd8cr1Zm34MQIDAQABo2MwYTAdBgNVHQ4EFgQU486X86LMbNNSDw7J
-NcT2U30NrikwHwYDVR0jBBgwFoAU486X86LMbNNSDw7JNcT2U30NrikwDwYDVR0T
-AQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAYYwDQYJKoZIhvcNAQENBQADggIBAN0N
-IPVBv8aaKDHDK9Nsu5fwiGp8GgkAN0B1+D34CbxTuzCDurToVMHCPEdo9tk/AzE4
-Aa1p/kMW9X3XP8IyCFFj+BpEVkBRr9fXTVuh3XRHbyN6tXFbkKWQ/6QeUcnefq2k
-DCpqEGjJQWsujZ4tJKkJl2HLIBZL6FAa/kaDLFHd3LeV1immC66CiN3ieHejCJL1
-zZXiWi8pNxvEanTLPBaBjCw/AAl/owg/ySu2hGZzL0wsFboPrUbo4J+KvL1pvwql
-PCT8AylJKCu+cn/N9zZDtUsgZJQBIq7btoakC3mCSnfVTlcbxfHVef0DbfohFqoV
-ZpdmIuy0/njw7o+2uL/ArPJscPOhNl60ocDbdFIyYvc85oxyts8yMvKDdWV9Bm//
-kl7lv4QUAvjqjb7ZgUhYibVk3Eu6n1MGZOP40l1/mm922/Wcd2n/HZVk/LsJs4tt
-B6DLMDpf5nzeI1Yz/QtDGvNyb4aiJoRV5tQb9KkFfIeSzBS/ORZto4tVHKS37lxV
-d1r8kFyCgpL9KASdahfyLBWCC7awlcOQP1QJA5QoO9u5Feq3lU0VnJF0YCZh8GOy
-py3n1TR6S59eT495BiKDjWnhdVchEa8zMGIW/wFW7EX/LyW2zX3hQsdfnmMWUPVr
-O3nOxjgSfRAfKWQ2Ny1APKcn6I83P5PFLhtO5I12
------END CERTIFICATE-----`
-
-	switch code {
-	case coinBTC:
-		return []*rpc.ServerInfo{{Server: "dev.shiftcrypto.ch:50002", TLS: true, PEMCert: devShiftCA}}
-	case coinTBTC:
-		return []*rpc.ServerInfo{
-			{Server: "s1.dev.shiftcrypto.ch:51003", TLS: true, PEMCert: devShiftCA},
-			{Server: "s2.dev.shiftcrypto.ch:51003", TLS: true, PEMCert: devShiftCA},
-		}
-	case coinLTC:
-		return []*rpc.ServerInfo{{Server: "dev.shiftcrypto.ch:50004", TLS: true, PEMCert: devShiftCA}}
-	case coinTLTC:
-		return []*rpc.ServerInfo{{Server: "dev.shiftcrypto.ch:51004", TLS: true, PEMCert: devShiftCA}}
-	default:
-		panic(errp.Newf("The given code %s is unknown.", code))
-	}
-}
-
-func (backend *Backend) defaultElectrumXServers(code string) []*rpc.ServerInfo {
-	if backend.arguments.DevMode() {
-		return defaultDevServers(code)
-	}
-
-	return backend.defaultProdServers(code)
 }
 
 // Coin returns the coin with the given code or an error if no such coin exists.
@@ -596,7 +534,6 @@ func (backend *Backend) Start() <-chan interface{} {
 		backend.arguments.BitBox02DirectoryPath(),
 		backend.Register,
 		backend.Deregister).Start()
-
 	if backend.arguments.DevMode() {
 		backend.baseDetector.Start()
 	}

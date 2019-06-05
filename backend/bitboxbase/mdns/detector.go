@@ -18,9 +18,11 @@ package mdns
 import (
 	"context"
 	"net"
+	"regexp"
 	"time"
 
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase"
+	"github.com/digitalbitbox/bitbox-wallet-app/util/errp"
 	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
 	"github.com/grandcat/zeroconf"
 	"github.com/sirupsen/logrus"
@@ -75,6 +77,14 @@ func (detector *Detector) TryMakeNewBase(ip string) (bool, error) {
 	}
 	var baseDevice bitboxbase.Interface
 	var err error
+
+	match := regexp.MustCompile(`[0-9]+(?:\.[0-9]+){3}(:[0-9]+)`).MatchString(ip)
+
+	if !match {
+		err = errp.New("Ip Expression does not match")
+		detector.log.WithError(err).Error("Tried to create a new bitbox base, but an invalid IP was passed: " + ip)
+		return false, err
+	}
 	baseDevice, err = bitboxbase.NewBitBoxBase(ip, bitboxBaseID)
 
 	if err != nil {
