@@ -17,13 +17,14 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/digitalbitbox/bitbox-wallet-app/util/jsonp"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 //Base models the api of the base middleware
 type Base interface {
-	BlockInfo() string
+	BlockInfo() interface{}
 }
 
 // Handlers provides a web API to the Bitbox.
@@ -59,5 +60,5 @@ func (handlers *Handlers) Uninit() {
 
 func (handlers *Handlers) getBlockInfoHandler(_ *http.Request) (interface{}, error) {
 	handlers.log.Debug("Block Info")
-	return handlers.base.BlockInfo(), nil
+	return jsonp.MustMarshal(handlers.base.BlockInfo()), nil
 }

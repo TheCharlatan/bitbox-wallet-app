@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"time"
 
 	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
 	"github.com/digitalbitbox/bitbox-wallet-app/util/observable"
@@ -32,10 +31,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type BaseMiddlewareInfo struct {
+	Blocks         int64   `json:"blocks"`
+	Difficulty     float64 `json:"difficulty"`
+	LightningAlias string  `json:"lightningAlias"`
+}
+
 // Updater implements observable blockchainInfo.
 type Updater struct {
 	observable.Implementation
-	blockchainInfo string
+	middlewareInfo *BaseMiddlewareInfo
 	log            *logrus.Entry
 	running        bool
 	ip             string
@@ -44,19 +49,20 @@ type Updater struct {
 	websocketURL   url.URL
 }
 
-// BlockInfo returns the last received blockchain information packet from the middleware
-func (updater *Updater) BlockInfo() string {
-	return updater.blockchainInfo
+// MiddlewareInfo returns the last received blockchain information packet from the middleware
+func (updater *Updater) MiddlewareInfo() interface{} {
+	return updater.middlewareInfo
 }
 
 // NewUpdater returns a new bitboxbase updater.
 func NewUpdater(ip string) *Updater {
 	updater := &Updater{
-		log:          logging.Get().WithGroup("bitboxbase"),
-		ip:           ip,
-		rootURL:      url.URL{Scheme: "http", Host: ip, Path: "/"},
-		getEnvURL:    url.URL{Scheme: "http", Host: ip, Path: "/getenv"},
-		websocketURL: url.URL{Scheme: "ws", Host: ip, Path: "/ws"},
+		middlewareInfo: &BaseMiddlewareInfo{},
+		log:            logging.Get().WithGroup("bitboxbase"),
+		ip:             ip,
+		rootURL:        url.URL{Scheme: "http", Host: ip, Path: "/"},
+		getEnvURL:      url.URL{Scheme: "http", Host: ip, Path: "/getenv"},
+		websocketURL:   url.URL{Scheme: "ws", Host: ip, Path: "/ws"},
 	}
 	return updater
 }
@@ -95,6 +101,7 @@ func (updater *Updater) Connect(ip string, bitboxBaseID string) error {
 	return nil
 }
 
+// GetEnv fetches some information on the services running on the base
 func (updater *Updater) GetEnv() ([]byte, error) {
 	response, err := http.Get(updater.getEnvURL.String())
 	if err != nil {
@@ -111,35 +118,49 @@ func (updater *Updater) GetEnv() ([]byte, error) {
 	return bodyBytes, err
 }
 
-//Stop provides a setter for the running flag
+// Stop provides a setter for the running flag
 func (updater *Updater) Stop() {
 	updater.running = false
 }
 
 func listenWebsocket(updater *Updater, bitboxBaseID string) {
 	updater.log.Printf("connecting to %s", updater.websocketURL.String())
-	c, _, err := websocket.DefaultDialer.Dial(updater.websocketURL.String(), nil)
+	client, _, err := websocket.DefaultDialer.Dial(updater.websocketURL.String(), nil)
 	if err != nil {
 		updater.log.Printf("Websocket dial failed: %s", err.Error())
 	}
 	// TODO: add proper error handling
-	//defer c.Close()
 
 	for {
-		_, message, err := c.ReadMessage()
+		err = client.ReadJSON(updater.middlewareInfo)
 		if err != nil {
-			updater.log.Println("read:", err)
+			updater.log.Error("Websocket read failed:", err)
+			err = client.Close()
+			if err != nil {
+				updater.log.Error("Failed to close websocket connection: ", err)
+			}
 			return
 		}
-		updater.blockchainInfo = string(message)
+
+		if err != nil {
+			updater.log.Error("Websocket middlewareInfo Unmarshal failed:", err)
+			err = client.Close()
+			if err != nil {
+				updater.log.Error("Failed to close websocket connection: ", err)
+			}
+			return
+		}
+
 		updater.Notify(observable.Event{
 			Subject: fmt.Sprintf("/bitboxbases/%s/blockinfo", bitboxBaseID),
 			Action:  action.Replace,
-			Object:  updater.blockchainInfo,
+			Object:  updater.middlewareInfo,
 		})
-		updater.log.Printf("Received blockinfo: %s , from id: %s", updater.blockchainInfo, bitboxBaseID)
-		time.Sleep(time.Second)
 		if !updater.running {
+			err = client.Close()
+			if err != nil {
+				updater.log.Error("Failed to close websocket connection: ", err)
+			}
 			return
 		}
 	}

@@ -41,7 +41,7 @@ type Interface interface {
 	GetRegisterTime() time.Time
 
 	// BlockInfo returns some blockchain information.
-	BlockInfo() string
+	BlockInfo() interface{}
 
 	// GetIP implement a getter for the IP under which the base is reachable
 	GetIP() string
@@ -102,8 +102,8 @@ func (base *BitBoxBase) GetUpdaterInstance() *updater.Updater {
 }
 
 //BlockInfo returns the received blockinfo packet from the updater
-func (base *BitBoxBase) BlockInfo() string {
-	return base.GetUpdaterInstance().BlockInfo()
+func (base *BitBoxBase) BlockInfo() interface{} {
+	return base.GetUpdaterInstance().MiddlewareInfo()
 }
 
 //GetIP implements a getter for the bitboxBase ip
