@@ -732,6 +732,9 @@ func (handlers *Handlers) postConnectElectrumHandler(r *http.Request) (interface
 		}, nil
 	}
 
+    //Once successfull, tell the bitboxbase that it is connected to electrs
+    handlers.backend.BitBoxBasesRegistered()[bitboxBaseID].ElectrsConnected = true
+
 	var success = true
 	return map[string]interface{}{"success": success}, nil
 }

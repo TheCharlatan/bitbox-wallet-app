@@ -51,6 +51,9 @@ type Interface interface {
 
 	// GetNetwork implements a getter for the network type, either mainnet or testnet
 	GetNetwork() string
+
+    // GetElectrsConnected implements a getter for a boolean indicating wether this base is connected to electrs
+    GetElectrsConected() bool
 }
 
 //BitBoxBase provides the dictated bitboxbase api to communicate with the base
@@ -61,6 +64,7 @@ type BitBoxBase struct {
 	closed          bool
 	updaterInstance *updater.Updater
 	electrsRPCPort  string
+    ElectrsConnected bool
 	network         string
 	log             *logrus.Entry
 }
@@ -71,6 +75,7 @@ func NewBitBoxBase(ip string, id string) (*BitBoxBase, error) {
 		log:             logging.Get().WithGroup("bitboxbase"),
 		bitboxBaseID:    id,
 		closed:          false,
+        ElectrsConnected: false,
 		ip:              strings.Split(ip, ":")[0],
 		updaterInstance: updater.NewUpdater(ip),
 		registerTime:    time.Now(),
@@ -129,6 +134,11 @@ func (base *BitBoxBase) GetNetwork() string {
 //GetRegisterTime implements a getter for the timestamp of when the bitboxBase was registered
 func (base *BitBoxBase) GetRegisterTime() time.Time {
 	return base.registerTime
+}
+
+//GetElectrsConnected is a getter for the boolean indicating if the base is connected with electrs
+func (base *BitBoxBase) GetElectrsConencted() bool {
+    return base.ElectrsConnected
 }
 
 //Close implements a method to unset the bitboxBase

@@ -25,6 +25,7 @@ import (
 //Base models the api of the base middleware
 type Base interface {
 	BlockInfo() interface{}
+    GetElectrsConnected() bool
 }
 
 // Handlers provides a web API to the Bitbox.
@@ -41,6 +42,7 @@ func NewHandlers(
 	handlers := &Handlers{log: log.WithField("bitboxbase", "base")}
 
 	handleFunc("/blockinfo", handlers.getBlockInfoHandler).Methods("GET")
+    handleFunc("/electrsConnected", handlers.getElectrsConnectedHandler).Methods("GET")
 
 	return handlers
 }
@@ -62,3 +64,9 @@ func (handlers *Handlers) getBlockInfoHandler(_ *http.Request) (interface{}, err
 	handlers.log.Debug("Block Info")
 	return jsonp.MustMarshal(handlers.base.BlockInfo()), nil
 }
+
+func (handlers *Handlers) getElectrsConnectedHandler(_ *http.Request) (interface{}, error) {
+    handlers.log.Debug("Electrs Connected")
+    return handlers.base.GetElectrsConnected(), nil
+}
+
