@@ -93,7 +93,7 @@ type Backend interface {
 	Deregister(deviceID string)
 	TryMakeNewBase(ip string) (bool, error)
 	Rates() map[string]map[string]float64
-	BitBoxBaseDeregister(bitboxBaseID string)
+	BitBoxBaseDeregister(bitboxBaseID string, permanent bool)
 	DownloadCert(string) (string, error)
 	CheckElectrumServer(string, string) error
 	RegisterTestKeystore(string)
@@ -637,7 +637,7 @@ func (handlers *Handlers) postDisconnectBaseHandler(r *http.Request) (interface{
 	handlers.log.WithField("BitBox Base ID", bitboxBaseID).Debug("Disconnecting from middleware with the following id:")
 
 	//Implment proper error handling for deregister
-	handlers.backend.BitBoxBaseDeregister(bitboxBaseID)
+	handlers.backend.BitBoxBaseDeregister(bitboxBaseID, true)
 	var success = true
 	return map[string]interface{}{"success": success}, nil
 }

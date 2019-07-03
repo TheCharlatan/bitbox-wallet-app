@@ -32,8 +32,9 @@ import (
 type Detector struct {
 	baseDeviceInterface map[string]bitboxbase.Interface
 
-	onRegister   func(bitboxbase.Interface) error
-	onUnregister func(string)
+	onRegister          func(bitboxbase.Interface) error
+	onUnregister        func(string, bool)
+	onConnectionFailure func(string)
 
 	removedIDs map[string]bool //keeps track of the bases that were removed manually by the user.
 
@@ -47,7 +48,8 @@ type Detector struct {
 //
 func NewDetector(
 	onRegister func(bitboxbase.Interface) error,
-	onUnregister func(string),
+	onUnregister func(string, bool),
+	onConnectionFailure func(string),
 	config *config.Config,
 	bitboxBaseConfigDir string,
 ) *Detector {
@@ -55,6 +57,7 @@ func NewDetector(
 		baseDeviceInterface: map[string]bitboxbase.Interface{},
 		onRegister:          onRegister,
 		onUnregister:        onUnregister,
+		onConnectionFailure: onConnectionFailure,
 		removedIDs:          make(map[string]bool),
 		config:              config,
 		bitboxBaseConfigDir: bitboxBaseConfigDir,
@@ -70,7 +73,7 @@ func (detector *Detector) TryMakeNewBase(address string) (bool, error) {
 		if detector.checkIfRemoved(bitboxBaseID) {
 			bitboxBase.Close()
 			delete(detector.baseDeviceInterface, bitboxBaseID)
-			detector.onUnregister(bitboxBaseID)
+			detector.onUnregister(bitboxBaseID, true)
 			detector.log.WithField("bitboxbase-id", bitboxBaseID).Info("Unregistered bitboxbase")
 		}
 	}
@@ -82,7 +85,7 @@ func (detector *Detector) TryMakeNewBase(address string) (bool, error) {
 		return false, nil
 	}
 
-	baseDevice, err := bitboxbase.NewBitBoxBase(address, bitboxBaseID, detector.config, detector.bitboxBaseConfigDir)
+	baseDevice, err := bitboxbase.NewBitBoxBase(address, bitboxBaseID, detector.config, detector.bitboxBaseConfigDir, detector.onConnectionFailure)
 
 	if err != nil {
 		detector.log.WithError(err).Error("Failed to register Base")
@@ -96,11 +99,13 @@ func (detector *Detector) TryMakeNewBase(address string) (bool, error) {
 	return true, nil
 }
 
-// RemoveBase allows external objects to delete a detector entry.
-func (detector *Detector) RemoveBase(bitboxBaseID string) {
+// RemoveBase allows external objects to delete a detector entry. MDNS will continue looking up bases removed in this fashion.
+func (detector *Detector) RemoveBase(bitboxBaseID string, permanent bool) {
 	if _, ok := detector.baseDeviceInterface[bitboxBaseID]; ok {
 		delete(detector.baseDeviceInterface, bitboxBaseID)
-		detector.removedIDs[bitboxBaseID] = true
+		if permanent {
+			detector.removedIDs[bitboxBaseID] = true
+		}
 	}
 }
 

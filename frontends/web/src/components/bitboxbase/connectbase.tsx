@@ -24,14 +24,14 @@ export interface ConnectedBaseProps {
     bitboxBaseID: string;
 }
 
-interface BlockInfoType {
+interface MiddlewareInfoType {
     blocks: number;
     difficulty: number;
     lightningAlias: string;
 }
 
 interface State {
-    blockInfo?: BlockInfoType;
+    middlewareInfo?: MiddlewareInfoType;
     bitboxBaseID: string;
 }
 
@@ -42,7 +42,7 @@ export class ConnectedBase extends Component<Props, State> {
     constructor(props) {
         super(props);
         this.state = {
-            blockInfo: undefined,
+            middlewareInfo: undefined,
             bitboxBaseID: '',
         };
     }
@@ -52,7 +52,7 @@ export class ConnectedBase extends Component<Props, State> {
         if (this.props.bitboxBaseID !== this.state.bitboxBaseID) {
             this.setState({ bitboxBaseID : this.props.bitboxBaseID});
             apiSubscribe('/bitboxbases/' + this.props.bitboxBaseID + '/middlewareinfo', ({ object }) => {
-                this.setState({ blockInfo: object });
+                this.setState({ middlewareInfo: object });
             });
         }
     }
@@ -83,20 +83,20 @@ export class ConnectedBase extends Component<Props, State> {
             bitboxBaseID,
         }: RenderableProps<Props>,
         {
-            blockInfo,
+            middlewareInfo,
         }: State,
     ) {
-        if (!blockInfo) {
+        if (!middlewareInfo) {
             return null;
         }
 
         return (
                 <div class="row">
                     <div class="flex flex-1 flex-row flex-between flex-items-center spaced">
-                        <p>Block Number: {blockInfo.blocks}</p>
-                        <p>Difficulty: {blockInfo.difficulty}</p>
+                        <p>Block Number: {middlewareInfo.blocks}</p>
+                        <p>Difficulty: {middlewareInfo.difficulty}</p>
                         <p>Device ID: {bitboxBaseID}</p>
-                        <p>Lightning Alias: {blockInfo.lightningAlias}</p>
+                        <p>Lightning Alias: {middlewareInfo.lightningAlias}</p>
                         <div class="buttons flex flex-row flex-end">
                             <Button onClick={this.removeBitBoxBase} danger>Delete</Button>
                         </div>
