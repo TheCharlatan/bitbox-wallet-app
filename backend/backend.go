@@ -165,7 +165,7 @@ func NewBackend(arguments *arguments.Arguments, environment Environment) (*Backe
 	}
 	backend.notifier = notifier
 
-	backend.baseManager = mdns.NewManager(backend.BitBoxBaseDetect, backend.BitBoxBasesDetected, backend.bitBoxBaseRegister, backend.BitBoxBaseDeregister, backend.config, backend.arguments.BitBoxBaseDirectoryPath())
+	backend.baseManager = mdns.NewManager(backend.BitBoxBaseDetect, backend.BitBoxBasesDetected, backend.bitBoxBaseRegister, backend.BitBoxBaseDeregister, backend.bitboxBaseConnectionFailure, backend.config, backend.arguments.BitBoxBaseDirectoryPath())
 
 	GetRatesUpdaterInstance().Observe(func(event observable.Event) { backend.events <- event })
 
@@ -665,7 +665,6 @@ func (backend *Backend) BitBoxBaseDetect(detectedBase mdns.BaseDeviceInfo) {
 func (backend *Backend) bitBoxBaseRegister(theBase bitboxbase.Interface) error {
 	backend.bitboxBases[theBase.Identifier()] = theBase
 	backend.onBitBoxBaseInit(theBase)
-	theBase.Init(backend.Testing())
 	theBase.GetUpdaterInstance().Observe(func(event observable.Event) { backend.events <- event })
 	select {
 	case backend.events <- backendEvent{
@@ -678,15 +677,19 @@ func (backend *Backend) bitBoxBaseRegister(theBase bitboxbase.Interface) error {
 }
 
 // BitBoxBaseDeregister deregisters the device with the given ID from this backend.
-func (backend *Backend) BitBoxBaseDeregister(bitboxBaseID string) {
+func (backend *Backend) BitBoxBaseDeregister(bitboxBaseID string, permanent bool) {
 	if _, ok := backend.bitboxBases[bitboxBaseID]; ok {
 		backend.bitboxBases[bitboxBaseID].Close()
 		backend.onBitBoxBaseUninit(bitboxBaseID)
 		delete(backend.bitboxBases, bitboxBaseID)
-		backend.baseManager.RemoveBase(bitboxBaseID)
+		backend.baseManager.RemoveBase(bitboxBaseID, permanent)
 		backend.events <- backendEvent{Type: "bitboxbases", Data: "registeredChanged"}
 	}
 	backend.events <- backendEvent{Type: "bitboxbases", Data: "registeredChanged"}
+}
+
+func (backend *Backend) bitboxBaseConnectionFailure(bitboxBaseID string) {
+	backend.BitBoxBaseDeregister(bitboxBaseID, false)
 }
 
 func (backend *Backend) uninitAccounts() {

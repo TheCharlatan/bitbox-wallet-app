@@ -24,14 +24,14 @@ export interface ConnectedBaseProps {
     bitboxBaseID: string;
 }
 
-interface BlockInfoType {
+interface MiddlewareInfoType {
     blocks: number;
     difficulty: number;
     lightningAlias: string;
 }
 
 interface State {
-    blockInfo?: BlockInfoType;
+    middlewareInfo?: MiddlewareInfoType;
     bitboxBaseID: string;
 }
 
@@ -42,7 +42,7 @@ export class ConnectedBase extends Component<Props, State> {
     constructor(props) {
         super(props);
         this.state = {
-            blockInfo: undefined,
+            middlewareInfo: undefined,
             bitboxBaseID: '',
         };
     }
@@ -52,7 +52,7 @@ export class ConnectedBase extends Component<Props, State> {
         if (this.props.bitboxBaseID !== this.state.bitboxBaseID) {
             this.setState({ bitboxBaseID : this.props.bitboxBaseID});
             apiSubscribe('/bitboxbases/' + this.props.bitboxBaseID + '/middlewareinfo', ({ object }) => {
-                this.setState({ blockInfo: object });
+                this.setState({ middlewareInfo: object });
             });
         }
     }
@@ -72,10 +72,10 @@ export class ConnectedBase extends Component<Props, State> {
             bitboxBaseID,
         }: RenderableProps<Props>,
         {
-            blockInfo,
+            middlewareInfo,
         }: State,
     ) {
-        if (!blockInfo) {
+        if (!middlewareInfo) {
             return null;
         }
 
@@ -83,10 +83,10 @@ export class ConnectedBase extends Component<Props, State> {
                 <div class="row">
                     <div class="flex flex-1 flex-row flex-between flex-items-center spaced">
                         <ul>
-                            <li>Block Number: {blockInfo.blocks}</li>
-                            <li>Difficulty: {blockInfo.difficulty}</li>
+                            <li>Block Number: {middlewareInfo.blocks}</li>
+                            <li>Difficulty: {middlewareInfo.difficulty}</li>
                             <li>Device ID: {bitboxBaseID}</li>
-                            <li>Lightning Alias: {blockInfo.lightningAlias}</li>
+                            <li>Lightning Alias: {middlewareInfo.lightningAlias}</li>
                         </ul>
                     </div>
                     <div class="row">

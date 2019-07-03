@@ -15,21 +15,20 @@
 package bitboxbase
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/updater"
+	basemessages "github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/updater/messages"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/coins/btc/electrum"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/config"
 	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
+	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 )
 
 // Interface represents bitbox base.
 type Interface interface {
-	Init(testing bool)
-
 	// Identifier returns the bitboxBaseID.
 	Identifier() string
 
@@ -51,57 +50,57 @@ type Interface interface {
 
 // BitBoxBase provides the dictated bitboxbase api to communicate with the base
 type BitBoxBase struct {
-	bitboxBaseID        string //This is just the ip currently
-	registerTime        time.Time
-	address             string
-	closed              bool
-	updaterInstance     *updater.Updater
-	electrsRPCPort      string
-	network             string
-	log                 *logrus.Entry
-	config              *config.Config
-	bitboxBaseConfigDir string
+	bitboxBaseID             string //This is just the ip currently
+	registerTime             time.Time
+	address                  string
+	updaterInstance          *updater.Updater
+	electrsRPCPort           string
+	network                  string
+	log                      *logrus.Entry
+	config                   *config.Config
+	bitboxBaseConfigDir      string
+	bitboxBaseEventsOutgoing chan proto.Message
+	apiMap                   map[string]chan *basemessages.BitBoxBaseOut
 }
 
 //NewBitBoxBase creates a new bitboxBase instance
-func NewBitBoxBase(address string, id string, config *config.Config, bitboxBaseConfigDir string) (*BitBoxBase, error) {
+func NewBitBoxBase(address string, id string, config *config.Config, bitboxBaseConfigDir string, onConnectionFailure func(string)) (*BitBoxBase, error) {
 	bitboxBase := &BitBoxBase{
-		log:                 logging.Get().WithGroup("bitboxbase"),
-		bitboxBaseID:        id,
-		closed:              false,
-		address:             strings.Split(address, ":")[0],
-		updaterInstance:     updater.NewUpdater(address, bitboxBaseConfigDir),
-		registerTime:        time.Now(),
-		config:              config,
-		bitboxBaseConfigDir: bitboxBaseConfigDir,
+		log:                      logging.Get().WithGroup("bitboxbase"),
+		bitboxBaseID:             id,
+		address:                  strings.Split(address, ":")[0],
+		updaterInstance:          updater.NewUpdater(address, bitboxBaseConfigDir, onConnectionFailure),
+		registerTime:             time.Now(),
+		config:                   config,
+		bitboxBaseConfigDir:      bitboxBaseConfigDir,
+		bitboxBaseEventsOutgoing: make(chan proto.Message),
+		apiMap:                   make(map[string]chan *basemessages.BitBoxBaseOut),
 	}
-	err := bitboxBase.GetUpdaterInstance().Connect(address, bitboxBase.bitboxBaseID)
+	bitboxBase.apiMap["systemEnv"] = make(chan *basemessages.BitBoxBaseOut)
+	err := bitboxBase.updaterInstance.Connect(address, bitboxBase.bitboxBaseID, bitboxBase.bitboxBaseEventsOutgoing, bitboxBase.apiMap)
 	if err != nil {
 		return nil, err
 	}
 
-	bodyBytes, err := bitboxBase.GetUpdaterInstance().GetEnv()
-	if err != nil {
-		return nil, err
-	}
-	var envData map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &envData); err != nil {
-		bitboxBase.log.WithError(err).Error(" Failed to unmarshal GetEnv body bytes")
-		// bitboxBase.GetUpdaterInstance().Stop()
-		return bitboxBase, err
-	}
-	var ok bool
-	bitboxBase.electrsRPCPort, ok = envData["electrsRPCPort"].(string)
-	if !ok {
-		bitboxBase.log.Error(" Getenv did not return an electrsRPCPort string field")
-		return bitboxBase, err
-	}
-	bitboxBase.network, ok = envData["network"].(string)
-	if !ok {
-		bitboxBase.log.Error(" Getenv did not return a network string field")
-		return bitboxBase, err
-	}
+	bitboxBase.getAndSetSystemEnv()
 	return bitboxBase, err
+}
+
+func (base *BitBoxBase) getAndSetSystemEnv() {
+	outgoing := &basemessages.BitBoxBaseIn{
+		BitBoxBaseIn: &basemessages.BitBoxBaseIn_BaseSystemEnvIn{
+			BaseSystemEnvIn: &basemessages.BaseSystemEnvIn{},
+		},
+	}
+	base.bitboxBaseEventsOutgoing <- outgoing
+	incoming := <-base.apiMap["systemEnv"]
+	systemEnvIncoming, ok := incoming.BitBoxBaseOut.(*basemessages.BitBoxBaseOut_BaseSystemEnvOut)
+	if ok {
+		base.log.Println("Received SystemEnv information", systemEnvIncoming)
+	}
+
+	base.electrsRPCPort = systemEnvIncoming.BaseSystemEnvOut.GetElectrsRPCPort()
+	base.network = systemEnvIncoming.BaseSystemEnvOut.GetElectrsRPCPort()
 }
 
 // ConnectElectrum connects to the electrs server on the base and configures the backend accordingly
@@ -146,7 +145,7 @@ func (base *BitBoxBase) GetUpdaterInstance() *updater.Updater {
 
 // MiddlewareInfo returns the received MiddlewareInfo packet from the updater
 func (base *BitBoxBase) MiddlewareInfo() interface{} {
-	return base.GetUpdaterInstance().MiddlewareInfo()
+	return base.updaterInstance.MiddlewareInfo()
 }
 
 // Identifier implements a getter for the bitboxBase ID
@@ -166,10 +165,5 @@ func (base *BitBoxBase) isTestnet() bool {
 
 // Close implements a method to unset the bitboxBase
 func (base *BitBoxBase) Close() {
-	base.GetUpdaterInstance().Stop()
-	base.closed = true
-}
-
-// Init initializes the bitboxBase
-func (base *BitBoxBase) Init(testing bool) {
+	base.updaterInstance.Stop()
 }
