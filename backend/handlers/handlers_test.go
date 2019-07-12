@@ -15,27 +15,67 @@
 package handlers_test
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/digitalbitbox/bitbox-wallet-app/backend"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/arguments"
+	"github.com/digitalbitbox/bitbox-wallet-app/backend/devices/usb"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/handlers"
+	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
+	"github.com/digitalbitbox/bitbox-wallet-app/util/system"
 	"github.com/digitalbitbox/bitbox-wallet-app/util/test"
 	"github.com/gorilla/mux"
 )
 
+// webdevEnvironment implements backend.Environment
+type webdevEnvironment struct {
+}
+
+// DeviceInfos implements backend.Environment
+func (webdevEnvironment) DeviceInfos() []usb.DeviceInfo {
+	return usb.DeviceInfos()
+}
+
+// SystemOpen implements backend.Environment
+func (webdevEnvironment) SystemOpen(url string) error {
+	return system.Open(url)
+}
+
+// NotifyUser implements backend.Environment
+func (webdevEnvironment) NotifyUser(text string) {
+	log := logging.Get().WithGroup("servewallet")
+	log.Infof("NotifyUser: %s", text)
+	// We use system notifications on unix/macOS, the primary dev environments.
+	switch runtime.GOOS {
+	case "darwin":
+		// #nosec G204
+		err := exec.Command("osascript", "-e",
+			fmt.Sprintf(`display notification "%s" with title \"BitBox Wallet DEV\"`, text))
+		if err != nil {
+			log.Error(err)
+		}
+	case "linux":
+		// #nosec G204b
+		err := exec.Command("notify-send", "BitBox Wallet DEV", text).Run()
+		if err != nil {
+			log.Error(err)
+		}
+	}
+}
+
 // List all routes with `go test backend/handlers/handlers_test.go -v`.
 func TestListRoutes(t *testing.T) {
-	const skip = true
-	if skip {
-		t.Skip("manual listing of handlers")
-	}
-	connectionData := handlers.NewConnectionData(8082, "")
+	connectionData := handlers.NewConnectionData(-1, "")
 	backend, err := backend.NewBackend(arguments.NewArguments(
 		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
-		nil,
+		webdevEnvironment{},
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -71,5 +111,103 @@ func TestListRoutes(t *testing.T) {
 	})
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func TestTestingHandler(t *testing.T) {
+	connectionData := handlers.NewConnectionData(-1, "")
+
+	backend, err := backend.NewBackend(arguments.NewArguments(
+		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
+		webdevEnvironment{},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	handlers := handlers.NewHandlers(backend, connectionData)
+	req, err := http.NewRequest("GET", "/api/testing", nil)
+	if err != nil {
+		t.Errorf("An error occurred. %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handlers.Router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Status code differs. Expected %d. Got %d", http.StatusOK, status)
+	}
+}
+
+func TestVersionHandler(t *testing.T) {
+	connectionData := handlers.NewConnectionData(-1, "")
+
+	backend, err := backend.NewBackend(arguments.NewArguments(
+		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
+		webdevEnvironment{},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	handlers := handlers.NewHandlers(backend, connectionData)
+	req, err := http.NewRequest("GET", "/api/version", nil)
+	if err != nil {
+		t.Errorf("An error occurred. %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handlers.Router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Status code differs. Expected %d. Got %d", http.StatusOK, status)
+	}
+}
+
+func TestUpdateHandler(t *testing.T) {
+	connectionData := handlers.NewConnectionData(-1, "")
+
+	backend, err := backend.NewBackend(arguments.NewArguments(
+		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
+		webdevEnvironment{},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	handlers := handlers.NewHandlers(backend, connectionData)
+	req, err := http.NewRequest("GET", "/api/update", nil)
+	if err != nil {
+		t.Errorf("An error occurred. %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handlers.Router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Status code differs. Expected %d. Got %d", http.StatusOK, status)
+	}
+}
+
+func TestConfigDefaultHandler(t *testing.T) {
+	connectionData := handlers.NewConnectionData(-1, "")
+
+	backend, err := backend.NewBackend(arguments.NewArguments(
+		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
+		webdevEnvironment{},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	handlers := handlers.NewHandlers(backend, connectionData)
+	req, err := http.NewRequest("GET", "/api/config/default", nil)
+	if err != nil {
+		t.Errorf("An error occurred. %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handlers.Router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Status code differs. Expected %d. Got %d", http.StatusOK, status)
+	}
+
+	req, err = http.NewRequest("POST", "/api/config", bytes.NewBuffer([]byte(rr.Body.String())))
+	if err != nil {
+		t.Errorf("An error occurred. %v", err)
+	}
+	rr = httptest.NewRecorder()
+	handlers.Router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Status code differs. Expected %d. Got %d", http.StatusOK, status)
 	}
 }
