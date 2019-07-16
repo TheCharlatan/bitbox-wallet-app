@@ -23,13 +23,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/digitalbitbox/bitbox-wallet-app/backend"
-	"github.com/digitalbitbox/bitbox-wallet-app/backend/arguments"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/devices/usb"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/handlers"
+	"github.com/digitalbitbox/bitbox-wallet-app/backend/handlers/mocks"
+
 	"github.com/digitalbitbox/bitbox-wallet-app/util/system"
-	"github.com/digitalbitbox/bitbox-wallet-app/util/test"
 	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,18 +51,32 @@ func (testEnvironment) SystemOpen(url string) error {
 	return system.Open(url)
 }
 
+func NewBackendMock() *mocks.Backend {
+	return &mocks.Backend{}
+}
+
 // List all routes with `go test backend/handlers/handlers_test.go -v`.
 func TestListRoutes(t *testing.T) {
 	connectionData := handlers.NewConnectionData(8082, "")
-	backend, err := backend.NewBackend(arguments.NewArguments(
-		test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
-		testEnvironment{},
-	)
-	if err != nil {
-		fmt.Println(err)
-	}
-	handlers := handlers.NewHandlers(backend, connectionData)
-	err = handlers.Router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	//backend, err := backend.NewBackend(arguments.NewArguments(
+	//	test.TstTempDir("bitbox-wallet-listroutes-"), false, false, false, false, false),
+	//	testEnvironment{},
+	//)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	mockBackendInstance := NewBackendMock()
+	mockBackendInstance.On("OnAccountInit", mock.AnythingOfType("func(accounts.Interface)")).Return()      //.Return(func() {}).Once()
+	mockBackendInstance.On("OnAccountUninit", mock.AnythingOfType("func(accounts.Interface)")).Return()    //.Return(func() {}).Once()
+	mockBackendInstance.On("OnDeviceInit", mock.AnythingOfType("func(device.Interface)")).Return()         //.Return(func() {}).Once()
+	mockBackendInstance.On("OnDeviceUninit", mock.AnythingOfType("func(string)")).Return()                 //.Return(func() {}).Once()
+	mockBackendInstance.On("OnBitBoxBaseInit", mock.AnythingOfType("func(bitboxbase.Interface)")).Return() //.Return(func() {}).Once()
+	mockBackendInstance.On("OnBitBoxBaseUninit", mock.AnythingOfType("func(string)")).Return()             //.Return(func() {}).Once()
+	//mockBackendInstance.On("Start").Return(<-chan interface)
+	mockBackendInstance.On("Start").Return()
+
+	handlers := handlers.NewHandlers(mockBackendInstance, connectionData)
+	err := handlers.Router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 		pathTemplate, err := route.GetPathTemplate()
 		if err != nil {
 			return err
@@ -88,12 +102,13 @@ func TestListRoutes(t *testing.T) {
 
 func requestTester(request *http.Request, t *testing.T) *httptest.ResponseRecorder {
 	connectionData := handlers.NewConnectionData(8082, "")
-	backendInstance, err := backend.NewBackend(arguments.NewArguments(
-		test.TstTempDir("test-tempdir-"), false, false, false, false, false),
-		testEnvironment{},
-	)
-	require.NoError(t, err)
-	handlers := handlers.NewHandlers(backendInstance, connectionData)
+	//backendInstance, err := backend.NewBackend(arguments.NewArguments(
+	//	test.TstTempDir("test-tempdir-"), false, false, false, false, false),
+	//	testEnvironment{},
+	//)
+	mockBackendInstance := NewBackendMock()
+	//require.NoError(t, err)
+	handlers := handlers.NewHandlers(mockBackendInstance, connectionData)
 
 	rr := httptest.NewRecorder()
 	handlers.Router.ServeHTTP(rr, request)
