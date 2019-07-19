@@ -18,8 +18,11 @@ import (
 	"strings"
 	"time"
 
+	//"github.com/aristanetworks/goarista/openconfig/client"
+	grpcclient "github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/grpc"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/updater"
 	basemessages "github.com/digitalbitbox/bitbox-wallet-app/backend/bitboxbase/updater/messages"
+
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/coins/btc/electrum"
 	"github.com/digitalbitbox/bitbox-wallet-app/backend/config"
 	"github.com/digitalbitbox/bitbox-wallet-app/util/logging"
@@ -61,6 +64,7 @@ type BitBoxBase struct {
 	bitboxBaseConfigDir      string
 	bitboxBaseEventsOutgoing chan proto.Message
 	apiMap                   map[string]chan *basemessages.BitBoxBaseOut
+	client                   *grpcclient.Client
 }
 
 //NewBitBoxBase creates a new bitboxBase instance
@@ -77,30 +81,27 @@ func NewBitBoxBase(address string, id string, config *config.Config, bitboxBaseC
 		apiMap:                   make(map[string]chan *basemessages.BitBoxBaseOut),
 	}
 	bitboxBase.apiMap["systemEnv"] = make(chan *basemessages.BitBoxBaseOut)
-	err := bitboxBase.updaterInstance.Connect(address, bitboxBase.bitboxBaseID, bitboxBase.bitboxBaseEventsOutgoing, bitboxBase.apiMap)
+	//err := bitboxBase.updaterInstance.Connect(address, bitboxBase.bitboxBaseID, bitboxBase.bitboxBaseEventsOutgoing, bitboxBase.apiMap)
+	//if err != nil {
+	//	return nil, err
+	//}
+	baseClient, err := grpcclient.NewClient(address)
 	if err != nil {
-		return nil, err
+		return bitboxBase, err
 	}
-
+	bitboxBase.client = baseClient
+	bitboxBase.client.Connect()
 	bitboxBase.getAndSetSystemEnv()
+	// Set up a connection to the server.
+
 	return bitboxBase, err
 }
 
 func (base *BitBoxBase) getAndSetSystemEnv() {
-	outgoing := &basemessages.BitBoxBaseIn{
-		BitBoxBaseIn: &basemessages.BitBoxBaseIn_BaseSystemEnvIn{
-			BaseSystemEnvIn: &basemessages.BaseSystemEnvIn{},
-		},
-	}
-	base.bitboxBaseEventsOutgoing <- outgoing
-	incoming := <-base.apiMap["systemEnv"]
-	systemEnvIncoming, ok := incoming.BitBoxBaseOut.(*basemessages.BitBoxBaseOut_BaseSystemEnvOut)
-	if ok {
-		base.log.Println("Received SystemEnv information", systemEnvIncoming)
-	}
+	systemEnvResponse := base.client.GetEnv()
 
-	base.electrsRPCPort = systemEnvIncoming.BaseSystemEnvOut.GetElectrsRPCPort()
-	base.network = systemEnvIncoming.BaseSystemEnvOut.GetElectrsRPCPort()
+	base.electrsRPCPort = systemEnvResponse.GetElectrsRPCPort()
+	base.network = systemEnvResponse.GetNetwork()
 }
 
 // ConnectElectrum connects to the electrs server on the base and configures the backend accordingly

@@ -622,7 +622,7 @@ func (backend *Backend) Start() <-chan interface{} {
 		backend.Deregister, onlyOne).Start()
 
 	if backend.arguments.DevMode() {
-		backend.baseDetector.Start()
+		//backend.baseDetector.Start()
 	}
 	backend.initPersistedAccounts()
 	return backend.events
