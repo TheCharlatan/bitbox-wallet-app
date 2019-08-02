@@ -50,8 +50,9 @@ type Manager struct {
 
 	baseDeviceInterface map[string]bitboxbase.Interface
 
-	onRegister   func(bitboxbase.Interface) error
-	onUnregister func(string)
+	onRegister        func(bitboxbase.Interface) error
+	onElectrumConnect func(bitboxbase.Interface) error
+	onUnregister      func(string)
 
 	removedIDs map[string]bool // keeps track of the bases that were removed manually by the user.
 
@@ -65,6 +66,7 @@ type Manager struct {
 func NewManager(
 	onDetect func(),
 	onRegister func(bitboxbase.Interface) error,
+	onElectrumConnect func(bitboxbase.Interface) error,
 	onUnregister func(string),
 	config *config.Config,
 	bitboxBaseConfigDir string,
@@ -74,6 +76,7 @@ func NewManager(
 		onDetect:            onDetect,
 		detectedBases:       map[string]string{},
 		onRegister:          onRegister,
+		onElectrumConnect:   onElectrumConnect,
 		onUnregister:        onUnregister,
 		removedIDs:          make(map[string]bool),
 		config:              config,
@@ -105,7 +108,12 @@ func (manager *Manager) TryMakeNewBase(address string) (bool, error) {
 	}
 
 	manager.log.WithField("host", manager.detectedBases[address]).WithField("address", address)
-	baseDevice, err := bitboxbase.NewBitBoxBase(address, bitboxBaseID, manager.config, manager.bitboxBaseConfigDir, manager.onUnregister)
+	baseDevice, err := bitboxbase.NewBitBoxBase(address,
+		bitboxBaseID,
+		manager.config,
+		manager.bitboxBaseConfigDir,
+		manager.onElectrumConnect,
+		manager.onUnregister)
 
 	if err != nil {
 		manager.log.WithError(err).Error("Failed to register Base")

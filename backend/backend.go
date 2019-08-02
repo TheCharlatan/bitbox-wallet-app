@@ -166,7 +166,8 @@ func NewBackend(arguments *arguments.Arguments, environment Environment) (*Backe
 
 	backend.baseManager = mdns.NewManager(
 		backend.EmitBitBoxBaseDetected,
-		backend.bitBoxBaseRegister,
+		backend.bitboxBaseRegister,
+		backend.bitboxBaseElectrum,
 		backend.BitBoxBaseDeregister,
 		backend.config,
 		backend.arguments.BitBoxBaseDirectoryPath(),
@@ -406,7 +407,12 @@ func (backend *Backend) Coin(code string) (coin.Coin, error) {
 	dbFolder := backend.arguments.CacheDirectoryPath()
 	switch code {
 	case coinRBTC:
-		servers := []*rpc.ServerInfo{{Server: "127.0.0.1:52001", TLS: false, PEMCert: ""}}
+		var servers []*rpc.ServerInfo
+		if backend.arguments.DevServers() {
+			servers = []*rpc.ServerInfo{{Server: "127.0.0.1:52001", TLS: false, PEMCert: ""}}
+		} else {
+			servers = backend.defaultElectrumXServers(code)
+		}
 		coin = btc.NewCoin("rbtc", "RBTC", &chaincfg.RegressionNetParams, dbFolder, servers, "")
 	case coinTBTC:
 		servers := backend.defaultElectrumXServers(code)
@@ -665,8 +671,8 @@ func (backend *Backend) EmitBitBoxBaseDetected() {
 	backend.events <- backendEvent{Type: "bitboxbases", Data: "detectedChanged"}
 }
 
-// bitBoxBaseRegister registers the given bitboxbase at this backend.
-func (backend *Backend) bitBoxBaseRegister(theBase bitboxbase.Interface) error {
+// bitboxBaseRegister registers the given bitboxbase at this backend.
+func (backend *Backend) bitboxBaseRegister(theBase bitboxbase.Interface) error {
 	backend.bitboxBases[theBase.Identifier()] = theBase
 	backend.onBitBoxBaseInit(theBase)
 	theBase.Init(backend.Testing())
@@ -678,7 +684,11 @@ func (backend *Backend) bitBoxBaseRegister(theBase bitboxbase.Interface) error {
 	}:
 	default:
 	}
+	return nil
+}
 
+// bitboxBaseElectrum provides a callback to switch the backend to the electrum server running on the base
+func (backend *Backend) bitboxBaseElectrum(theBase bitboxbase.Interface) error {
 	// Use this base as the Electrum backend for Bitcoin.
 	backend.log.Info("Using BitBox Base as the Bitcoin Backend")
 	for _, coinCode := range []string{

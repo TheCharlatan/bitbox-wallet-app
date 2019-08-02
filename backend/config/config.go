@@ -237,27 +237,49 @@ func (config *Config) SetBtcOnly() {
 
 // SetBTCElectrumServers sets the BTC configuration to the provided electrumIP and electrumCert
 func (config *Config) SetBTCElectrumServers(electrumAddress, electrumCert string) {
-	config.appConfig.Backend.BTC = btcCoinConfig{
-		ElectrumServers: []*rpc.ServerInfo{
-			{
-				Server:  electrumAddress,
-				TLS:     true,
-				PEMCert: electrumCert,
+	if electrumCert == "" {
+		config.appConfig.Backend.BTC = btcCoinConfig{
+			ElectrumServers: []*rpc.ServerInfo{
+				{
+					Server: electrumAddress,
+					TLS:    false,
+				},
 			},
-		},
+		}
+	} else {
+		config.appConfig.Backend.BTC = btcCoinConfig{
+			ElectrumServers: []*rpc.ServerInfo{
+				{
+					Server:  electrumAddress,
+					TLS:     true,
+					PEMCert: electrumCert,
+				},
+			},
+		}
 	}
 }
 
 // SetTBTCElectrumServers sets the TBTC configuration to the provided electrumIP and electrumCert
 func (config *Config) SetTBTCElectrumServers(electrumAddress, electrumCert string) {
-	config.appConfig.Backend.TBTC = btcCoinConfig{
-		ElectrumServers: []*rpc.ServerInfo{
-			{
-				Server:  electrumAddress,
-				TLS:     true,
-				PEMCert: electrumCert,
+	if electrumCert == "" {
+		config.appConfig.Backend.TBTC = btcCoinConfig{
+			ElectrumServers: []*rpc.ServerInfo{
+				{
+					Server: electrumAddress,
+					TLS:    false,
+				},
 			},
-		},
+		}
+	} else {
+		config.appConfig.Backend.TBTC = btcCoinConfig{
+			ElectrumServers: []*rpc.ServerInfo{
+				{
+					Server:  electrumAddress,
+					TLS:     true,
+					PEMCert: electrumCert,
+				},
+			},
+		}
 	}
 }
 

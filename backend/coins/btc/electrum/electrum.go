@@ -172,11 +172,18 @@ func DownloadCert(server string) (string, error) {
 	return string(pemCert), nil
 }
 
-// CheckElectrumServer checks if a tls connection can be established with the electrum server, and
+// CheckElectrumServer checks if a connection can be established with the electrum server, and
 // whether the server is an electrum server.
 func CheckElectrumServer(server string, pemCert string, log *logrus.Entry) error {
-	backends := []rpc.Backend{
-		NewElectrum(log, &rpc.ServerInfo{Server: server, TLS: true, PEMCert: pemCert}),
+	var backends []rpc.Backend
+	if pemCert == "" {
+		backends = []rpc.Backend{
+			NewElectrum(log, &rpc.ServerInfo{Server: server, TLS: false}),
+		}
+	} else {
+		backends = []rpc.Backend{
+			NewElectrum(log, &rpc.ServerInfo{Server: server, TLS: true, PEMCert: pemCert}),
+		}
 	}
 	conn, err := backends[0].EstablishConnection()
 	if err != nil {

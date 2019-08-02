@@ -67,6 +67,16 @@ export class ConnectedBase extends Component<Props, State> {
         });
     }
 
+    private connectNoiseElectrum = () => {
+        apiPost('bitboxbases/' + this.props.bitboxBaseID + '/connect-noise-electrum', {
+            bitboxBaseID : this.props.bitboxBaseID,
+        }).then(({success}) => {
+            if (!success) {
+                alertUser(success.errorMessage);
+            }
+        });
+    }
+
     public render(
         {
             bitboxBaseID,
@@ -88,10 +98,11 @@ export class ConnectedBase extends Component<Props, State> {
                             <li>Device ID: {bitboxBaseID}</li>
                             <li>Lightning Alias: {blockInfo.lightningAlias}</li>
                         </ul>
-                    </div>
-                    <div class="row">
                         <div class="buttons flex flex-row flex-end">
                             <Button onClick={this.connectElectrum}>Connect Electrum</Button>
+                        </div>
+                        <div class="buttons flex flex-row flex-end">
+                            <Button onClick={this.connectNoiseElectrum}>Connect Noise Electrum</Button>
                         </div>
                     </div>
                 </div>

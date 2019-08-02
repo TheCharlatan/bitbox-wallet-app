@@ -59,6 +59,9 @@ type Interface interface {
 	// MakeElectrumClient creates an Electrum client which talks to the base Electrum server.
 	// The messages are going through the noise-encrypted channel.
 	MakeElectrumClient() *client.ElectrumClient
+
+	// ConnectNoiseElectrum is the entrypoint into the electrum noise channel proxy.
+	ConnectNoiseElectrum() error
 }
 
 // BitBoxBase provides the dictated bitboxbase api to communicate with the base
@@ -72,6 +75,7 @@ type BitBoxBase struct {
 	log                 *logrus.Entry
 	config              *config.Config
 	bitboxBaseConfigDir string
+	OnElectrumConnect   func(Interface) error // calll this function with an instance of the BitBoxBase struct
 }
 
 type electrumBackend struct {
@@ -89,7 +93,13 @@ func (eb *electrumBackend) ServerInfo() *rpc.ServerInfo {
 }
 
 //NewBitBoxBase creates a new bitboxBase instance
-func NewBitBoxBase(address string, id string, config *config.Config, bitboxBaseConfigDir string, onUnregister func(string)) (*BitBoxBase, error) {
+func NewBitBoxBase(address string,
+	id string,
+	config *config.Config,
+	bitboxBaseConfigDir string,
+	onElectrumConnect func(Interface) error,
+	onUnregister func(string)) (*BitBoxBase, error) {
+
 	bitboxBase := &BitBoxBase{
 		log:                 logging.Get().WithGroup("bitboxbase"),
 		bitboxBaseID:        id,
@@ -98,6 +108,7 @@ func NewBitBoxBase(address string, id string, config *config.Config, bitboxBaseC
 		registerTime:        time.Now(),
 		config:              config,
 		bitboxBaseConfigDir: bitboxBaseConfigDir,
+		OnElectrumConnect:   onElectrumConnect,
 	}
 	err := bitboxBase.rpcClient.Connect(bitboxBase.bitboxBaseID)
 	if err != nil {
@@ -120,8 +131,9 @@ func (base *BitBoxBase) ConnectElectrum() error {
 
 	electrumCert, err := electrum.DownloadCert(electrumAddress)
 	if err != nil {
-		base.log.WithField("ElectrumIP: ", electrumAddress).Error(err.Error())
-		return err
+		base.log.WithError(err).Error("Failed to get cert from electrum ip: ", electrumAddress)
+		base.log.Println("Continuing without ssl cert")
+		electrumCert = ""
 	}
 
 	if err := electrum.CheckElectrumServer(
@@ -165,6 +177,12 @@ func (base *BitBoxBase) MakeElectrumClient() *client.ElectrumClient {
 			base.log,
 		),
 		base.log)
+}
+
+// ConnectNoiseElectrum connects to the electrs server on the base through a noise proxy on the base middleware and configures the backend accordingly
+func (base *BitBoxBase) ConnectNoiseElectrum() error {
+	base.log.Println("connecting to electrum noise proxy...")
+	return base.OnElectrumConnect(base)
 }
 
 // MiddlewareInfo returns the received MiddlewareInfo packet from the rpcClient

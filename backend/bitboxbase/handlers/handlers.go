@@ -27,6 +27,7 @@ import (
 type Base interface {
 	MiddlewareInfo() (rpcclient.SampleInfoResponse, error)
 	ConnectElectrum() error
+	ConnectNoiseElectrum() error
 }
 
 // Handlers provides a web API to the Bitbox.
@@ -44,6 +45,7 @@ func NewHandlers(
 
 	handleFunc("/middlewareinfo", handlers.getMiddlewareInfoHandler).Methods("GET")
 	handleFunc("/connect-electrum", handlers.postConnectElectrumHandler).Methods("POST")
+	handleFunc("/connect-noise-electrum", handlers.postConnectNoiseElectrumHandler).Methods("POST")
 
 	return handlers
 }
@@ -76,4 +78,12 @@ func (handlers *Handlers) postConnectElectrumHandler(r *http.Request) (interface
 		return map[string]interface{}{"success": false}, nil
 	}
 	return map[string]interface{}{"success": true}, nil
+}
+
+func (handlers *Handlers) postConnectNoiseElectrumHandler(r *http.Request) (interface{}, error) {
+	err := handlers.base.ConnectNoiseElectrum()
+	if err != nil {
+		return map[string]interface{}{"success": true}, nil
+	}
+	return map[string]interface{}{"success": false}, nil
 }
