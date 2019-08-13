@@ -23,6 +23,7 @@ import { Guide } from '../../components/guide/guide';
 import { Entry } from '../../components/guide/entry';
 import { FiatSelection } from '../../components/fiat/fiat';
 import { Header, Footer } from '../../components/layout';
+import InlineMessage  from '../../components/inlineMessage/InlineMessage';
 import { SwissMadeOpenSource } from '../../components/icon/logo';
 import { Toggle } from '../../components/toggle/toggle';
 import { SettingsButton } from '../../components/settingsButton/settingsButton';
@@ -40,6 +41,7 @@ export default class Settings extends Component {
     }
 
     state = {
+        restart: false,
         config: null,
     }
 
@@ -105,10 +107,35 @@ export default class Settings extends Component {
             });
     }
 
+    handleToggleProxy = event => {
+        if (event.target.checked) {
+            setConfig({
+                backend: {
+                    [event.target.id]: event.target.checked,
+                    proxyAddress: '127.0.0.1:9050',
+                }
+            })
+                .then(config => this.setState({ config, restart: true }));
+        } else {
+            setConfig({
+                backend: {
+                    [event.target.id]: event.target.checked,
+                    proxyAddress: '',
+                }
+            })
+                .then(config => this.setState({ config, restart: true }));
+        }
+    }
+
+    handleRestartDismissMessage = () => {
+        this.setState({ restart: false });
+    }
+
     render({
         t,
     }, {
         config,
+        restart,
     }) {
         const accountsList = [
             {
@@ -230,8 +257,30 @@ export default class Settings extends Component {
                                                                 id="coinControl"
                                                                 onChange={this.handleToggleCoinControl} />
                                                         </div>
+                                                        <div className={style.currency}>
+                                                            <div>
+                                                                <p className="m-none">{t('settings.expert.useProxy')}</p>
+                                                                <p className="m-none">
+                                                                </p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={config.backend.useProxy}
+                                                                id="useProxy"
+                                                                onChange={this.handleToggleProxy} />
+                                                        </div>
                                                         <SettingsButton link href="/settings/electrum">{t('settings.expert.electrum.title')}</SettingsButton>
                                                     </div>
+                                                    {
+                                                        restart && (
+                                                            <div class="row">
+                                                                <InlineMessage
+                                                                    type="success"
+                                                                    align="left"
+                                                                    message={t('settings.restart')}
+                                                                    onEnd={this.handleRestartDismissMessage} />
+                                                            </div>
+                                                        )
+                                                    }
                                                 </div>
                                             </div>
                                         </div>
