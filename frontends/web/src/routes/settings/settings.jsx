@@ -19,6 +19,7 @@ import { translate } from 'react-i18next';
 import { apiGet, apiPost } from '../../utils/request';
 import { setConfig } from '../../utils/config';
 import { Badge } from '../../components/badge/badge';
+import { Button, Input } from '../../components/forms';
 import { Guide } from '../../components/guide/guide';
 import { Entry } from '../../components/guide/entry';
 import { FiatSelection } from '../../components/fiat/fiat';
@@ -43,10 +44,16 @@ export default class Settings extends Component {
     state = {
         restart: false,
         config: null,
+        proxyAddress: '127.0.0.1:9050',
     }
 
     componentDidMount() {
-        apiGet('config').then(config => this.setState({ config }));
+        apiGet('config').then(config => {
+            this.setState({ config });
+            if (config.backend.proxyAddress) {
+                this.setState({ proxyAddress: config.backend.proxyAddress });
+            }
+        });
     }
 
     handleToggleAccount = event => {
@@ -112,10 +119,13 @@ export default class Settings extends Component {
             setConfig({
                 backend: {
                     [event.target.id]: event.target.checked,
-                    proxyAddress: '127.0.0.1:9050',
+                    proxyAddress: this.state.proxyAddress,
                 }
             })
-                .then(config => this.setState({ config, restart: true }));
+                .then(config => { 
+                    this.setState({ config, restart: true });
+                    console.log(config);
+                });
         } else {
             setConfig({
                 backend: {
@@ -127,6 +137,21 @@ export default class Settings extends Component {
         }
     }
 
+    handleFormChange = event => {
+        this.setState({
+            [event.target.name]: event.target.value,
+        });
+    }
+
+    setProxyAddress = () => {
+        setConfig({
+            backend: {
+                proxyAddress: this.state.proxyAddress,
+            }
+        }).then(config => this.setState({ config, restart: true }));
+    }
+
+
     handleRestartDismissMessage = () => {
         this.setState({ restart: false });
     }
@@ -136,6 +161,7 @@ export default class Settings extends Component {
     }, {
         config,
         restart,
+        proxyAddress,
     }) {
         const accountsList = [
             {
@@ -268,6 +294,23 @@ export default class Settings extends Component {
                                                                 id="useProxy"
                                                                 onChange={this.handleToggleProxy} />
                                                         </div>
+                                                        {
+                                                            config.backend.useProxy && (
+                                                                <div class="row extra">
+                                                                    <Input
+                                                                        name="proxyAddress"
+                                                                        onInput={this.handleFormChange}
+                                                                        value={proxyAddress}
+                                                                        placeholder="127.0.0.1:9050"
+                                                                    />
+                                                                    <Button primary
+                                                                        onClick={this.setProxyAddress}
+                                                                    >
+                                                                        {t('settings.expert.setProxyAddress')}
+                                                                    </Button>
+                                                                </div>
+                                                            )
+                                                        }
                                                         <SettingsButton link href="/settings/electrum">{t('settings.expert.electrum.title')}</SettingsButton>
                                                     </div>
                                                     {
